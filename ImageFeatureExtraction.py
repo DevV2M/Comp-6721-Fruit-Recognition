@@ -1,11 +1,26 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+
 import cv2
 import numpy as np
 import os
 from skimage.feature import local_binary_pattern
+#import torch
+#import torchvision
+#from torchvision import datasets, transforms
 
 
+#checking for device
+#device = torch.device('metal:{}'.format(torch.cuda.device_count()))
 
-def extract_color_features(image):
+#print(device)
+
+
+def extract_color_features(image, target_size):
     # Convert the image to the HSV color space
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -27,11 +42,18 @@ def extract_color_features(image):
     # Concatenate the histograms into a single feature vector
     color_features = np.concatenate((hue_hist.flatten(), saturation_hist.flatten(), value_hist.flatten()))
 
-    print("Color features: " , color_features.shape)
+    # Resize the color features to the target size
+    if len(color_features) < target_size:
+        color_features = np.pad(color_features, (0, target_size - len(color_features)), mode='constant')
+    elif len(color_features) > target_size:
+        color_features = color_features[:target_size]
+
+    print("Color features:", color_features.shape)
 
     return color_features
 
-def extract_shape_features(image):
+
+def extract_shape_features(image, target_size):
     # Convert the image to grayscale
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -59,11 +81,18 @@ def extract_shape_features(image):
     # Convert the shape features list to a numpy array
     shape_features = np.array(shape_features)
 
-    print("Shape features: " , shape_features.shape)
+    # Resize the shape features to the target size
+    if len(shape_features) < target_size:
+        shape_features = np.pad(shape_features, (0, target_size - len(shape_features)), mode='constant')
+    elif len(shape_features) > target_size:
+        shape_features = shape_features[:target_size]
+
+    print("Shape features:", shape_features.shape)
 
     return shape_features
 
-def extract_texture_features(image):
+
+def extract_texture_features(image, target_size):
     # Convert the image to grayscale
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -82,9 +111,16 @@ def extract_texture_features(image):
     # Flatten and return the histogram as the texture feature vector
     texture_features = hist.flatten()
 
-    print("Text features: " , texture_features.shape)
+    # Resize the texture features to the target size
+    if len(texture_features) < target_size:
+        texture_features = np.pad(texture_features, (0, target_size - len(texture_features)), mode='constant')
+    elif len(texture_features) > target_size:
+        texture_features = texture_features[:target_size]
+
+    print("Texture features:", texture_features.shape)
 
     return texture_features
+
 
 def combine_features(image):
     # Load and preprocess the image
@@ -92,9 +128,9 @@ def combine_features(image):
     preprocessed_image = image
 
     # Extract features using different methods
-    color_features = extract_color_features(preprocessed_image)
-    shape_features = extract_shape_features(preprocessed_image)
-    texture_features = extract_texture_features(preprocessed_image)
+    color_features = extract_color_features(preprocessed_image,24)
+    shape_features = extract_shape_features(preprocessed_image,20)
+    texture_features = extract_texture_features(preprocessed_image,10)
 
     # Combine the features into a single vector
     combined_features = np.concatenate((color_features, shape_features, texture_features))
@@ -102,22 +138,28 @@ def combine_features(image):
     return combined_features
 
 
-folder_path = "/Users/hadi/Desktop/Fruits/Orange"
+folder_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruitImages/Banana"
 file_list = os.listdir(folder_path)
 
 def loadImages(folder_path):
     for file_name in file_list:
-        if file_name.endswith(".jpg") or file_name.endswith(".png"):
-            image_path = os.path.join(folder_path, file_name)
-            # Perform your image processing tasks here
-            image = cv2.imread(image_path)
-            new_size = (7, 7)
-            image = cv2.resize(image, new_size)
-            combined_features = combine_features(image)
-            print("Combined Features Shape:", combined_features.shape)
-            #image.close()
+         if file_name.endswith(".jpg") or file_name.endswith(".png"):
+             image_path = os.path.join(folder_path, file_name)
+             # Perform your image processing tasks here
+             image = cv2.imread(image_path)
+             new_size = (32, 32)
+             image = cv2.resize(image, new_size)
+             combined_features = combine_features(image)
+             print(combined_features)
+             #image.close()
+        
 
+            
 
 # Print the shape of the combined feature vector
 loadImages(folder_path)
+#a = np.random.rand(20000,100)
+#print(a)
+
+
 
