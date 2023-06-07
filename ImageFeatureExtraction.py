@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[14]:
 
 
 import cv2
@@ -23,7 +23,7 @@ import pathlib
 from torchvision.transforms import ToTensor
 
 
-# In[2]:
+# In[15]:
 
 
 #checking for device
@@ -35,7 +35,7 @@ else:
     print ("MPS device not found.")
 
 
-# In[3]:
+# In[16]:
 
 
 def extract_color_features(image, target_size):
@@ -71,7 +71,7 @@ def extract_color_features(image, target_size):
     return color_features
 
 
-# In[4]:
+# In[17]:
 
 
 def extract_shape_features(image, target_size):
@@ -112,7 +112,7 @@ def extract_shape_features(image, target_size):
     return shape_features
 
 
-# In[5]:
+# In[18]:
 
 
 def extract_texture_features(image, target_size):
@@ -145,7 +145,7 @@ def extract_texture_features(image, target_size):
     return texture_features
 
 
-# In[6]:
+# In[19]:
 
 
 def combine_features(image):
@@ -166,11 +166,11 @@ def combine_features(image):
     return combined_features
 
 
-# In[7]:
+# In[83]:
 
 
 
-folder_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/training/Kiwi_Training"
+#folder_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/training/Kiwi_Training"
 
 def generate_features(image):
     #image = cv2.imread(image_path)
@@ -180,17 +180,17 @@ def generate_features(image):
     return combined_features
 
 def check_label(element):
-    if element == 'Banana_Training':
+    if element == 'Banana_Training' or element == "Banana_Test":
         return 1
-    elif element == 'Kiwi_Training':
+    elif element == 'Kiwi_Training' or element == "Kiwi_Test":
         return 2
-    elif element == 'Mango_Training':
+    elif element == 'Mango_Training' or element == "Mango_Test":
         return 3
-    elif element == 'Orange_Training':
+    elif element == 'Orange_Training' or element == "Orange_Test":
         return 4
-    elif element == 'Plum_Training':
+    elif element == 'Plum_Training' or element == "Plum_Test":
         return 5
-    elif element == 'Apple_Training':
+    elif element == 'Apple_Training' or element == "Apple_Test":
         return 6
     else:
         return 0  # Return 0 if the element is not found in the list
@@ -200,7 +200,6 @@ def loadImages(folder_path,class_):
     folder_path = folder_path
     file_list = os.listdir(folder_path)
     class_features = np.empty((0,55))
-    count = 0 
     for file_name in file_list:
          if file_name.endswith(".jpg") or file_name.endswith(".png"):
              image_path = os.path.join(folder_path, file_name)
@@ -209,38 +208,43 @@ def loadImages(folder_path,class_):
              new_size = (32, 32)
              image = cv2.resize(image, new_size)
              combined_features = combine_features(image)
+             #print(check_label(class_))
              combined_features = np.append(combined_features, check_label(class_))
              combined_features = np.expand_dims(combined_features, axis=0)
              class_features = np.append(class_features, combined_features,axis=0)
+    #print(class_features[0])
     return class_features
         
 
             
 
 #Print the shape of the combined feature vector
-loadImages(folder_path,"Kiwi_Training")
+#loadImages(folder_path,"Kiwi_Training")
 
 
-# In[8]:
+# In[84]:
 
 
 train_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/training"
+test_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/testing"
 
-root=pathlib.Path(train_path)
+root_training=pathlib.Path(train_path)
+root_testing=pathlib.Path(test_path)
 
 
-def generate_feature_vector(root):
+def generate_feature_vector(root,path):
     classes = []
     features = np.empty((0,55))
     labels = []
     for class_dir in root.iterdir():
         class_ = class_dir.name.split('/')[-1]
-        path = train_path +"/"
+        print(class_)
+        path_ = path +"/"
         if(class_!=".DS_Store"):
             print(class_)
-            path = path+class_
-            temp = loadImages(path,class_)
-            path = ""
+            path_ = path+"/"+class_
+            temp = loadImages(path_,class_)
+            path_ = ""
             classes.append(class_)
             features = np.append(features, temp,axis=0)
                 
@@ -249,37 +253,57 @@ def generate_feature_vector(root):
 #print(classes) #['Banana_Training', 'Kiwi_Training', 'Mango_Training', 'Orange_Training', 'Plum_Training', 'Apple_Training']
 
 
-# In[10]:
+# In[85]:
 
 
 #calculate size of training and testing images 
 
-f = generate_feature_vector(root) #total training features 
+f = generate_feature_vector(root_training,train_path) #total training features 
+t = generate_feature_vector(root_testing,test_path) #total testing features
 print(f.shape)
+print(t.shape)
 #train_count = len(glob.glob(train_path+"/**/*.png"))
 #test_count = len(glob.glob(test_path+"/**/*.png"))
 
 #print(train_count,test_count)
 
 
-# In[12]:
+# In[89]:
 
 
 # #Model Training and saving best model
+import sys
 
+xtrain = f[:,:-1]
+ytrain = f[:,-1]
 
-x_ = f[:,:-1]
-y_ = f[:,-1]
+xtest = t[:,:-1]
+ytest = t[:,-1]
 
-print(x_)
-print(y_)
+# print("Features for training:" ,xtrain)
+# print("Labels for training", ytrain)
+# print("Features for testing:", xtest)
+# with np.printoptions(threshold=sys.maxsize):
+#     print("Labels for training", ytrain)
+#     print("Labels for testing", ytest)
+
 
 dtc = tree.DecisionTreeClassifier(criterion="entropy")
-dtc.fit(x_, y_)
+dtc.fit(xtrain, ytrain)
+
+y_pred = dtc.predict(xtest)
+from sklearn.metrics import classification_report 
+print(classification_report(ytest, y_pred))
+from sklearn.metrics import confusion_matrix
+print("Confusion Matrix:\n", confusion_matrix(ytest, y_pred))
 tree.plot_tree(dtc)
-dot_data = tree.export_graphviz(dtc, out_file=None, feature_names=['Color', 'color', 'texture'], class_names=['Banana', 'Apple',"Orange","Plum","Mango","Kiwi"],filled=True, rounded=True)
+elements = ["color"] * 24 + ["shape"] * 20 + ["texture"] * 10
+dot_data = tree.export_graphviz(dtc, out_file=None, feature_names=elements, class_names=['Banana', 'Apple',"Orange","Plum","Mango","Kiwi"],filled=True, rounded=True)
 graph = graphviz.Source(dot_data)
 graph.render("mytree")
+
+
+# In[ ]
 
 
 # In[ ]:
