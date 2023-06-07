@@ -1,23 +1,41 @@
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
+#!/usr/bin/env python
+# coding: utf-8
 
-This is a temporary script file.
-"""
+# In[1]:
+
 
 import cv2
 import numpy as np
 import os
+from sklearn import tree
+from sklearn import preprocessing
+import graphviz
+#I Have problems with packages try running without this command 
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+import glob
+import matplotlib.pyplot as plt
 from skimage.feature import local_binary_pattern
-#import torch
-#import torchvision
-#from torchvision import datasets, transforms
+import torch
+import torchvision
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import pathlib
+from torchvision.transforms import ToTensor
+
+
+# In[2]:
 
 
 #checking for device
-#device = torch.device('metal:{}'.format(torch.cuda.device_count()))
+if torch.backends.mps.is_available():
+    mps_device = torch.device("mps")
+    x = torch.ones(1, device=mps_device)
+    print (x)
+else:
+    print ("MPS device not found.")
 
-#print(device)
+
+# In[3]:
 
 
 def extract_color_features(image, target_size):
@@ -48,9 +66,12 @@ def extract_color_features(image, target_size):
     elif len(color_features) > target_size:
         color_features = color_features[:target_size]
 
-    print("Color features:", color_features.shape)
+    #print("Color features:", color_features.shape)
 
     return color_features
+
+
+# In[4]:
 
 
 def extract_shape_features(image, target_size):
@@ -87,9 +108,11 @@ def extract_shape_features(image, target_size):
     elif len(shape_features) > target_size:
         shape_features = shape_features[:target_size]
 
-    print("Shape features:", shape_features.shape)
-
+    #print("Shape features:", shape_features.shape)
     return shape_features
+
+
+# In[5]:
 
 
 def extract_texture_features(image, target_size):
@@ -117,15 +140,19 @@ def extract_texture_features(image, target_size):
     elif len(texture_features) > target_size:
         texture_features = texture_features[:target_size]
 
-    print("Texture features:", texture_features.shape)
+    #print("Texture features:", texture_features.shape)
 
     return texture_features
+
+
+# In[6]:
 
 
 def combine_features(image):
     # Load and preprocess the image
     # Assuming image is already loaded or you can use OpenCV to load it
     preprocessed_image = image
+    #print(preprocessed_image)
 
     # Extract features using different methods
     color_features = extract_color_features(preprocessed_image,24)
@@ -133,15 +160,47 @@ def combine_features(image):
     texture_features = extract_texture_features(preprocessed_image,10)
 
     # Combine the features into a single vector
-    combined_features = np.concatenate((color_features, shape_features, texture_features))
+    #print(color_features.shape, shape_features.shape, texture_features.shape)
+    combined_features = np.concatenate((color_features, shape_features, texture_features),axis=None)
 
     return combined_features
 
 
-folder_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruitImages/Banana"
-file_list = os.listdir(folder_path)
+# In[7]:
 
-def loadImages(folder_path):
+
+
+folder_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/training/Kiwi_Training"
+
+def generate_features(image):
+    #image = cv2.imread(image_path)
+    #new_size = (32, 32)
+    #image = cv2.resize(image, new_size)
+    combined_features = combine_features(image)
+    return combined_features
+
+def check_label(element):
+    if element == 'Banana_Training':
+        return 1
+    elif element == 'Kiwi_Training':
+        return 2
+    elif element == 'Mango_Training':
+        return 3
+    elif element == 'Orange_Training':
+        return 4
+    elif element == 'Plum_Training':
+        return 5
+    elif element == 'Apple_Training':
+        return 6
+    else:
+        return 0  # Return 0 if the element is not found in the list
+
+def loadImages(folder_path,class_):
+    #print(folder_path)
+    folder_path = folder_path
+    file_list = os.listdir(folder_path)
+    class_features = np.empty((0,55))
+    count = 0 
     for file_name in file_list:
          if file_name.endswith(".jpg") or file_name.endswith(".png"):
              image_path = os.path.join(folder_path, file_name)
@@ -150,16 +209,81 @@ def loadImages(folder_path):
              new_size = (32, 32)
              image = cv2.resize(image, new_size)
              combined_features = combine_features(image)
-             print(combined_features)
-             #image.close()
+             combined_features = np.append(combined_features, check_label(class_))
+             combined_features = np.expand_dims(combined_features, axis=0)
+             class_features = np.append(class_features, combined_features,axis=0)
+    return class_features
         
 
             
 
-# Print the shape of the combined feature vector
-loadImages(folder_path)
-#a = np.random.rand(20000,100)
-#print(a)
+#Print the shape of the combined feature vector
+loadImages(folder_path,"Kiwi_Training")
+
+
+# In[8]:
+
+
+train_path = "/Users/hadi/Desktop/Concordia/Comp 6721/AIproject/fruits/training"
+
+root=pathlib.Path(train_path)
+
+
+def generate_feature_vector(root):
+    classes = []
+    features = np.empty((0,55))
+    labels = []
+    for class_dir in root.iterdir():
+        class_ = class_dir.name.split('/')[-1]
+        path = train_path +"/"
+        if(class_!=".DS_Store"):
+            print(class_)
+            path = path+class_
+            temp = loadImages(path,class_)
+            path = ""
+            classes.append(class_)
+            features = np.append(features, temp,axis=0)
+                
+    return features 
+#classes=sorted([j.name.split('/')[-1] for j in root.iterdir()])
+#print(classes) #['Banana_Training', 'Kiwi_Training', 'Mango_Training', 'Orange_Training', 'Plum_Training', 'Apple_Training']
+
+
+# In[10]:
+
+
+#calculate size of training and testing images 
+
+f = generate_feature_vector(root) #total training features 
+print(f.shape)
+#train_count = len(glob.glob(train_path+"/**/*.png"))
+#test_count = len(glob.glob(test_path+"/**/*.png"))
+
+#print(train_count,test_count)
+
+
+# In[12]:
+
+
+# #Model Training and saving best model
+
+
+x_ = f[:,:-1]
+y_ = f[:,-1]
+
+print(x_)
+print(y_)
+
+dtc = tree.DecisionTreeClassifier(criterion="entropy")
+dtc.fit(x_, y_)
+tree.plot_tree(dtc)
+dot_data = tree.export_graphviz(dtc, out_file=None, feature_names=['Color', 'color', 'texture'], class_names=['Banana', 'Apple',"Orange","Plum","Mango","Kiwi"],filled=True, rounded=True)
+graph = graphviz.Source(dot_data)
+graph.render("mytree")
+
+
+# In[ ]:
+
 
 
 
